@@ -1,0 +1,168 @@
+// Genesis Factory OS - Prisma Schema
+// 多租戶化妝品工廠作業系統
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==========================================
+// 核心模型 - 租戶與用戶
+// ==========================================
+
+model Tenant {
+  id         String   @id @default(cuid())
+  code       String   @unique
+  name       String
+  subdomain  String   @unique
+
+  // API Key 管理
+  apiKeyHash        String?
+  apiKeyCreatedAt   DateTime?
+  apiKeyLastUsedAt  DateTime?
+  apiKeyScopes      String[]
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  // Relations
+  users      User[]
+  materials  Material[]
+  suppliers  Supplier[]
+  units      Unit[]
+  warehouses Warehouse[]
+  auditLogs  AuditLog[]
+
+  @@index([subdomain])
+  @@index([apiKeyCreatedAt])
+}
+
+model User {
+  id         String   @id @default(cuid())
+  tenant_id  String
+  email      String
+  name       String?
+  role       String   @default("USER") // ADMIN, USER, VIEWER
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  // Relations
+  tenant Tenant @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+
+  @@unique([tenant_id, email])
+  @@index([tenant_id])
+  @@index([email])
+}
+
+// ==========================================
+// 審計日誌
+// ==========================================
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  tenant_id   String
+  actor_id    String
+  action      String // DATABASE_SEED, API_KEY_GENERATED, MATERIAL_CREATED, etc.
+  entity_type String
+  entity_id   String
+  metadata    Json?
+  created_at  DateTime @default(now())
+
+  // Relations
+  tenant Tenant @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+
+  @@index([tenant_id])
+  @@index([actor_id])
+  @@index([action])
+  @@index([created_at])
+}
+
+// ==========================================
+// 物料管理 (WMS)
+// ==========================================
+
+enum MaterialCategory {
+  RAW_MATERIAL    // 原料
+  PACKAGING       // 包材
+  SEMI_FINISHED   // 半成品
+  FINISHED_GOODS  // 成品
+}
+
+model Material {
+  id            String           @id @default(cuid())
+  tenant_id     String
+  code          String
+  name          String
+  name_en       String?
+  category      MaterialCategory
+  unit          String
+  supplier_id   String?
+  cas_number    String?
+  gmp_approved  Boolean          @default(false)
+  min_stock     Float            @default(0)
+  current_stock Float            @default(0)
+  specifications Json?
+  created_at    DateTime         @default(now())
+  updated_at    DateTime         @updatedAt
+
+  // Relations
+  tenant   Tenant    @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  supplier Supplier? @relation(fields: [supplier_id], references: [id], onDelete: SetNull)
+
+  @@unique([tenant_id, code])
+  @@index([tenant_id, category])
+  @@index([supplier_id])
+}
+
+model Supplier {
+  id             String   @id @default(cuid())
+  tenant_id      String
+  code           String
+  name           String
+  contact_person String?
+  contact_phone  String?
+  contact_email  String?
+  created_at     DateTime @default(now())
+  updated_at     DateTime @updatedAt
+
+  // Relations
+  tenant    Tenant     @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  materials Material[]
+
+  @@unique([tenant_id, code])
+  @@index([tenant_id])
+}
+
+model Unit {
+  id         String   @id @default(cuid())
+  tenant_id  String
+  code       String // kg, g, L, ml, piece, box, etc.
+  name       String
+  created_at DateTime @default(now())
+
+  // Relations
+  tenant Tenant @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+
+  @@unique([tenant_id, code])
+  @@index([tenant_id])
+}
+
+model Warehouse {
+  id         String   @id @default(cuid())
+  tenant_id  String
+  code       String
+  name       String
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  // Relations
+  tenant Tenant @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+
+  @@unique([tenant_id, code])
+  @@index([tenant_id])
+}
