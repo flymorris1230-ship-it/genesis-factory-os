@@ -67,15 +67,43 @@
 
 **技術棧決策** (不可變更):
 ```
-前端: Next.js 14 (App Router) + React + TypeScript + Tailwind CSS
+前端: Next.js 15 (App Router) + React 18 + TypeScript + Tailwind CSS
 API: tRPC (Type-safe API without REST)
-數據庫: PostgreSQL (NAS) + Prisma ORM
+數據庫: PostgreSQL (Supabase/NAS) + Prisma ORM
 認證: Supabase Auth
 日誌: Pino (結構化日誌)
-部署: Vercel (前端) + NAS (數據庫)
+部署: Vercel (前端) + Supabase/NAS (數據庫)
 AI 輔助: ai-agent-team-v1 (GAC)
 可觀測性: Structured Logging + Health Endpoints
 ```
+
+### 數據庫架構演進策略 (NEW)
+
+**當前狀態** (Sprint 1):
+- **開發環境**: Supabase PostgreSQL (Singapore 區域)
+- **選擇原因**:
+  1. 網段隔離問題 (Mac: 192.168.50.x ≠ NAS: 192.168.1.x)
+  2. 開發效率優先，可在任何網絡環境工作
+  3. 內建可視化管理工具，優秀的開發者體驗
+  4. 零配置，快速啟動
+
+**未來規劃** (Phase 1+):
+- **選項 A**: 繼續使用 Supabase PostgreSQL
+  - ✅ 優勢: 託管服務、高可用、自動備份、全球 CDN
+  - ⚠️ 考量: 成本評估 (Free Tier: 500MB, Paid: $25/月起)
+
+- **選項 B**: 遷移至 NAS PostgreSQL
+  - ✅ 優勢: 完全本地化、零雲端成本、數據主權
+  - ⚠️ 考量: 需配置 Cloudflare Tunnel 或同網段部署
+
+**遷移成本**: 極低 ⭐
+- Prisma 已抽象數據庫層，只需更改 `DATABASE_URL`
+- Schema 完全兼容 (都是 PostgreSQL)
+- 遷移工具: `pg_dump` + `pg_restore` 或 Prisma Migrate
+
+**決策點**: Sprint 2 結束時評估
+- 若 Free Tier 足夠 → 繼續 Supabase
+- 若需本地化 → 配置 NAS 網絡後遷移
 
 **架構原則** (必須遵守):
 1. **多租戶優先**: 每個功能都必須支持租戶隔離
